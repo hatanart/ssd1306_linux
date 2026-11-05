@@ -28,14 +28,7 @@ uint8_t ssd1306_init(uint8_t i2c_dev)
     if (rc > 0)
         return rc;
         
-    // test i2c connection
-    uint8_t cmd = SSD1306_COMM_CONTROL_BYTE;
-    uint8_t result = 0;
-    _i2c_write(&cmd, 1);
-    _i2c_read(&result, 1);
-    if (result == 0)
-        return 1;
-    
+    /* SSD1306 is write-only.  The first real command validates the device. */
     return 0;
 }
 
@@ -335,9 +328,16 @@ uint8_t ssd1306_oled_write_line(uint8_t size, char* ptr)
     data_buf[i++] = SSD1306_DATA_CONTROL_BYTE;
     
     // font table range in ascii table is from 0x20(space) to 0x7e(~)
-    while (ptr[index] != 0 && i <= 1024)
+    // small font gets 1 extra blank column after each glyph
+    uint8_t glyph_bytes = font_table_width + (size == SSD1306_FONT_SMALL ? 1 : 0);
+
+    while (ptr[index] != 0)
     {
         if ((ptr[index] < ' ') || (ptr[index] > '~'))
+            return 1;
+
+        // make sure the whole glyph fits before writing any of it
+        if (i + glyph_bytes > sizeof(data_buf))
             return 1;
 
         uint8_t* font_ptr = &font_table[(ptr[index] - 0x20) * font_table_width];
@@ -345,8 +345,6 @@ uint8_t ssd1306_oled_write_line(uint8_t size, char* ptr)
         for (j = 0; j < font_table_width; j++)
         {
             data_buf[i++] = font_ptr[j];
-            if (i > 1024)
-                return 1;
         }
         // insert 1 col space for small font size)
         if (size == SSD1306_FONT_SMALL)
@@ -366,20 +364,17 @@ uint8_t ssd1306_oled_write_string(uint8_t size, char* ptr)
     
     char* line = 0;
     char* cr = 0;
-    char buf[20];
+    char buf[129];
     
     line = ptr;
     do {
-        memset(buf, 0, 20);
+        size_t line_len;
+        memset(buf, 0, sizeof(buf));
         cr = strstr(line, "\\n");
-        if (cr != NULL)
-        {
-            strncpy(buf, line, cr - line);
-        }
-        else
-        {
-            strcpy(buf, line);
-        }
+        line_len = cr != NULL ? (size_t)(cr - line) : strlen(line);
+        if (line_len >= sizeof(buf))
+            return 1;
+        memcpy(buf, line, line_len);
         
         // set cursor position
         ssd1306_oled_set_XY(global_x, global_y);
@@ -424,7 +419,9 @@ uint8_t ssd1306_oled_clear_screen()
     {
         rc += ssd1306_oled_clear_line(i);
     }
-    
+
+    /* A full clear must leave the next write at the top-left, not row 7. */
+    rc += ssd1306_oled_set_XY(0, 0);
     return rc;
 }
 

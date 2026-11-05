@@ -2,6 +2,24 @@
 This is plain c code using linux I2C device node (/dev/i2c-X X for 0,1,2,3...).
 Please make sure the linux has run "modprobe i2c-dev".
 128x64 and 128x32 are supporting and using I2C interface ONLY
+
+## About this fork
+Fork of [armlabs/ssd1306_linux](https://github.com/armlabs/ssd1306_linux). Changes:
+- **SMBus support:** works on adapters that only offer SMBus block writes and not raw I2C
+  (for example the SMBus on PC motherboards, `i2c-i801` / `i2c-piix4`).
+  It picks the method automatically and splits transfers into 32-byte blocks.
+- Write errors are reported instead of ignored.
+- Removed the startup read test (the SSD1306 can't be read over I2C, and it fails on SMBus).
+- Clearing the whole screen moves the cursor back to the top left.
+- Longer lines with `-m`, and a fix for a buffer overflow with long lines.
+
+### Using a PC motherboard SMBus header
+**Use at your own risk.** The motherboard SMBus is shared with RAM SPD chips, sensors and other devices.
+- Load the drivers: `sudo modprobe i2c-dev` and `sudo modprobe i2c-i801` (Intel) or `i2c-piix4` (AMD).
+- Find the bus: `i2cdetect -l`, then look for the SMBus adapter and note its number.
+- Check that address `0x3c` is free **before** connecting the OLED: `sudo i2cdetect -y <bus>`.
+- The header usually runs at 3.3V. Check your board's manual for the pinout.
+- Then use `-n <bus>` with every command, for example `./ssd1306_bin -n 9 -I 128x64`.
 ## Files
 **linux_i2c.c** source code for i2c control in linux device node.
 **linux_i2c.h** header file for i2c control in linux.

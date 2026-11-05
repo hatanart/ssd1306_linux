@@ -75,10 +75,10 @@ int main(int argc, char **argv)
                 inverted = atoi(optarg);
                 break;
             case 'l':
-                strncpy(line, optarg, sizeof(line));
+                snprintf(line, sizeof(line), "%s", optarg);
                 break;
             case 'm':
-                strncpy(msg, optarg, sizeof(msg));
+                snprintf(msg, sizeof(msg), "%s", optarg);
                 break;    
             case 'n':
                 i2c_node_address = (uint8_t)atoi(optarg);
